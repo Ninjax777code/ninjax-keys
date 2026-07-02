@@ -1,72 +1,56 @@
 <!DOCTYPE html>
-<html lang="pt">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ninjax Hub - Painel de Keys</title>
+    <title>Ninjax Hub - Gerar Keys</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a0f; color: #fff; font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .container { background: #141420; border-radius: 16px; padding: 40px; width: 500px; border: 1px solid #2a2a3a; }
-        h1 { color: #8232c8; text-align: center; margin-bottom: 30px; font-size: 28px; }
-        label { display: block; margin-bottom: 5px; color: #aaa; font-size: 13px; }
-        select, input { width: 100%; padding: 12px; background: #1a1a2e; border: 1px solid #2a2a3a; border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 15px; }
-        .btn { width: 100%; padding: 14px; background: #8232c8; border: none; border-radius: 8px; color: #fff; font-size: 16px; font-weight: bold; cursor: pointer; }
-        .btn:hover { background: #9a40e0; }
-        .key-result { margin-top: 20px; padding: 20px; background: #0d0d18; border-radius: 8px; border: 1px solid #2a2a3a; display: none; }
-        .key-code { font-size: 22px; text-align: center; font-family: monospace; color: #00ff88; letter-spacing: 3px; word-break: break-all; }
-        .key-info { text-align: center; color: #aaa; margin-top: 8px; font-size: 12px; }
+        body { background: #0a0a0f; color: #fff; font-family: Arial; text-align: center; padding: 50px; }
+        .container { background: #141420; padding: 30px; border-radius: 10px; width: 400px; margin: auto; }
+        input, select, button { width: 100%; padding: 10px; margin: 5px 0; background: #1a1a2e; border: 1px solid #333; color: #fff; border-radius: 5px; }
+        button { background: #8232c8; cursor: pointer; font-weight: bold; }
+        button:hover { background: #9a40e0; }
+        #result { margin-top: 15px; color: #0f0; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔐 Ninjax Hub Keys</h1>
-        <label>Tipo de Key</label>
-        <select id="keyType">
+        <h1>🔐 Ninjax Keys</h1>
+        <input id="webhook" type="password" placeholder="Cole seu Webhook aqui">
+        <select id="duration">
             <option value="1">1 Hora</option>
             <option value="5">5 Horas</option>
             <option value="12">12 Horas</option>
             <option value="24">24 Horas</option>
-            <option value="permanent">Permanente</option>
+            <option value="0">Permanente</option>
         </select>
-        <label>Quantidade</label>
-        <input type="number" id="keyAmount" value="1" min="1" max="10">
-        <button class="btn" onclick="generateKey()">🎲 Gerar Key</button>
-        <div class="key-result" id="keyResult">
-            <div class="key-code" id="keyCode"></div>
-            <div class="key-info" id="keyInfo"></div>
-        </div>
+        <input id="amount" type="number" value="1" min="1" max="10" placeholder="Quantidade">
+        <button onclick="generate()">🎲 Gerar Key</button>
+        <div id="result"></div>
     </div>
     <script>
-        const API_URL = 'https://jsonblob.com/api/jsonBlob/019f246c-ef0f-76be-8e25-62f5163ffca3';
-        async function generateKey() {
-            const type = document.getElementById('keyType').value;
-            const amount = parseInt(document.getElementById('keyAmount').value) || 1;
+        async function generate() {
+            const webhook = document.getElementById('webhook').value;
+            const duration = parseInt(document.getElementById('duration').value);
+            const amount = parseInt(document.getElementById('amount').value);
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            try {
-                const res = await fetch(API_URL, { headers: { 'Accept': 'application/json' } });
-                const data = await res.json();
-                let allKeys = data.keys || [];
-                let newKeys = [];
-                for (let j = 0; j < amount; j++) {
-                    let key = '';
-                    for (let i = 0; i < 16; i++) key += chars[Math.floor(Math.random() * chars.length)];
-                    const now = Date.now();
-                    const expires = type === 'permanent' ? 'permanent' : now + (parseInt(type) * 3600000);
-                    newKeys.push({ key, type, expires, created: now });
-                }
-                allKeys = [...allKeys, ...newKeys];
-                await fetch(API_URL, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ keys: allKeys, updated: Date.now() })
-                });
-                document.getElementById('keyCode').textContent = newKeys.map(k => k.key).join('\n');
-                document.getElementById('keyInfo').textContent = `Tipo: ${type === 'permanent' ? 'Permanente' : type + 'h'} | Expira: ${type === 'permanent' ? 'Nunca' : new Date(newKeys[0].expires).toLocaleString()}`;
-                document.getElementById('keyResult').style.display = 'block';
-            } catch(e) {
-                alert('Erro: ' + e.message);
+            let keys = [];
+            
+            for (let j = 0; j < amount; j++) {
+                let key = '';
+                for (let i = 0; i < 16; i++) key += chars[Math.floor(Math.random() * chars.length)];
+                let expires = duration === 0 ? 'permanent' : new Date(Date.now() + duration * 3600000).toISOString().replace('T', ' ').substring(0, 16);
+                keys.push({key, expires});
             }
+            
+            let msg = '🔑 **Keys Geradas**\n';
+            keys.forEach(k => msg += `\`${k.key}\` | Expira: ${k.expires}\n`);
+            
+            const res = await fetch(webhook + '?wait=true', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content: msg})
+            });
+            
+            document.getElementById('result').innerHTML = res.ok ? '✅ Keys geradas! Verifique o Discord.' : '❌ Erro!';
         }
     </script>
 </body>
